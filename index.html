@@ -1,10 +1,314 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="de">
 <head>
-<meta charset="utf-8" />
-<title>suchtkrueppelzaunfabrik.life — Krypto-Shop</title>
+  <meta charset="UTF-8">
+  <title>suchtkrueppelzaunfabrik.life / erc20.online</title>
+  <style>
+    body {
+      margin: 0;
+      font-family: Arial, sans-serif;
+      background-size: cover;
+      background-repeat: no-repeat;
+      background-position: center;
+      background-color: #f5f5f5;
+    }
+    header {
+      display: flex;
+      align-items: center;
+      padding: 10px;
+      background-size: cover;
+      background-position: center;
+      background-color: #333;
+      color: white;
+    }
+    header img {
+      height: 40px;
+      margin-right: 10px;
+    }
+    nav button {
+      margin: 5px;
+      padding: 8px 12px;
+    }
+    #ticker {
+      background: black;
+      color: yellow;
+      padding: 5px;
+      overflow: hidden;
+      white-space: nowrap;
+    }
+    #products, #cart {
+      padding: 10px;
+    }
+    #popup, #adminPopup, #checkoutPopup {
+      position: fixed;
+      top: 50%; left: 50%;
+      transform: translate(-50%,-50%);
+      background: white;
+      border: 1px solid #333;
+      padding: 20px;
+      z-index: 1000;
+      display: none;
+      max-height: 80vh;
+      overflow-y: auto;
+    }
+    #overlay {
+      position: fixed;
+      top:0; left:0; width:100%; height:100%;
+      background: rgba(0,0,0,0.5);
+      z-index: 999;
+      display:none;
+    }
+    footer {
+      background: #222;
+      color: #eee;
+      padding: 10px;
+      text-align: center;
+    }
+    textarea { width: 100%; }
+    input, textarea { margin-bottom: 10px; }
+  </style>
 </head>
 <body>
-<!-- Hier sollte der gesamte Shop-Code eingefügt werden, den wir erstellt haben -->
+  <div id="overlay"></div>
+  <header id="shopHeader">
+    <img id="logo" src="" alt="Logo" style="display:none;">
+    <h1>Mein Krypto-Shop</h1>
+  </header>
+  <div id="ticker"></div>
+  <nav id="categories"></nav>
+  <div id="products"></div>
+  <div id="cart"></div>
+
+  <!-- Produkt-Pop-up -->
+  <div id="popup"></div>
+
+  <!-- Admin-Pop-up -->
+  <div id="adminPopup"></div>
+
+  <!-- Checkout-Pop-up -->
+  <div id="checkoutPopup"></div>
+
+  <footer>
+    <p>Impressum &copy; suchtkrueppelzaunfabrik.life / erc20.online</p>
+  </footer>
+
+<script>
+/* ---------- Local Storage Handling ---------- */
+const store = {
+  categories: JSON.parse(localStorage.getItem("categories")||"[]"),
+  products: JSON.parse(localStorage.getItem("products")||"[]"),
+  orders: JSON.parse(localStorage.getItem("orders")||"[]"),
+  ticker: localStorage.getItem("ticker")||"Willkommen im Shop!",
+  crypto: JSON.parse(localStorage.getItem("crypto")||"{}"),
+  logo: localStorage.getItem("logo")||"",
+  headerImage: localStorage.getItem("headerImage")||"",
+  backgroundImage: localStorage.getItem("backgroundImage")||""
+};
+function saveStore(){ 
+  localStorage.setItem("categories",JSON.stringify(store.categories));
+  localStorage.setItem("products",JSON.stringify(store.products));
+  localStorage.setItem("orders",JSON.stringify(store.orders));
+  localStorage.setItem("ticker",store.ticker);
+  localStorage.setItem("crypto",JSON.stringify(store.crypto));
+  localStorage.setItem("logo",store.logo);
+  localStorage.setItem("headerImage",store.headerImage);
+  localStorage.setItem("backgroundImage",store.backgroundImage);
+}
+
+/* ---------- UI Rendering ---------- */
+function renderCategories(){
+  const nav=document.getElementById("categories");
+  nav.innerHTML="";
+  store.categories.forEach(cat=>{
+    const btn=document.createElement("button");
+    btn.textContent=cat;
+    btn.onclick=()=>renderProducts(cat);
+    nav.appendChild(btn);
+  });
+}
+function renderProducts(cat){
+  const div=document.getElementById("products");
+  div.innerHTML="";
+  store.products.filter(p=>p.category===cat).forEach(prod=>{
+    const btn=document.createElement("button");
+    btn.textContent=prod.name;
+    btn.onclick=()=>showProduct(prod);
+    div.appendChild(btn);
+  });
+}
+function showProduct(prod){
+  showOverlay();
+  const popup=document.getElementById("popup");
+  popup.style.display="block";
+  popup.innerHTML=`
+    <h2>${prod.name}</h2>
+    <p>${prod.desc||""}</p>
+    <p>Preis: ${prod.price} EUR (nur Krypto)</p>
+    <button onclick="addToCart('${prod.id}')">In den Warenkorb</button>
+    <button onclick="closePopup('popup')">Schließen</button>
+  `;
+}
+let cart=[];
+function addToCart(id){
+  cart.push(id);
+  renderCart();
+  closePopup("popup");
+}
+function renderCart(){
+  const div=document.getElementById("cart");
+  div.innerHTML="<h3>Warenkorb</h3>";
+  cart.forEach(id=>{
+    const p=store.products.find(x=>x.id===id);
+    div.innerHTML+=`<p>${p.name} - ${p.price} EUR</p>`;
+  });
+  if(cart.length){
+    const btn=document.createElement("button");
+    btn.textContent="Zur Kasse";
+    btn.onclick=()=>checkout();
+    div.appendChild(btn);
+  }
+}
+function checkout(){
+  showOverlay();
+  const div=document.getElementById("checkoutPopup");
+  div.style.display="block";
+  div.innerHTML=`
+    <h2>Checkout</h2>
+    <h3>Krypto-Adressen</h3>
+    <pre>${JSON.stringify(store.crypto,null,2)}</pre>
+    <h3>Ihre Daten</h3>
+    <input type="email" id="custEmail" placeholder="E-Mail"><br>
+    <textarea id="custAddr" rows="10" placeholder="Lieferadresse"></textarea><br>
+    <button onclick="placeOrder()">Bestellung abschicken</button>
+    <button onclick="closePopup('checkoutPopup')">Schließen</button>
+  `;
+}
+function placeOrder(){
+  const email=document.getElementById("custEmail").value;
+  const addr=document.getElementById("custAddr").value;
+  const items=cart.map(id=>store.products.find(p=>p.id===id));
+  store.orders.push({email,addr,items,date:new Date().toISOString()});
+  saveStore();
+  cart=[];
+  renderCart();
+  alert("Bestellung gespeichert! Bitte an die Krypto-Adresse überweisen.");
+  closePopup("checkoutPopup");
+}
+function showOverlay(){document.getElementById("overlay").style.display="block";}
+function closePopup(id){
+  document.getElementById(id).style.display="none";
+  document.getElementById("overlay").style.display="none";
+}
+
+/* ---------- Admin ---------- */
+function openAdmin(){
+  showOverlay();
+  const div=document.getElementById("adminPopup");
+  div.style.display="block";
+  div.innerHTML=`
+    <h2>Admin-Bereich</h2>
+    <h3>Kategorien</h3>
+    <input id="newCat" placeholder="Neue Kategorie">
+    <button onclick="addCategory()">Hinzufügen</button>
+    <div>${store.categories.join(", ")}</div>
+    <h3>Produkte</h3>
+    <input id="prodName" placeholder="Name">
+    <input id="prodPrice" placeholder="Preis">
+    <input id="prodDesc" placeholder="Beschreibung">
+    <select id="prodCat">${store.categories.map(c=>`<option>${c}</option>`)}</select>
+    <button onclick="addProduct()">Hinzufügen</button>
+    <h3>Ticker</h3>
+    <input id="tickerText" value="${store.ticker}">
+    <button onclick="saveTicker()">Speichern</button>
+    <h3>Krypto-Adressen (JSON)</h3>
+    <textarea id="cryptoText" rows="5">${JSON.stringify(store.crypto,null,2)}</textarea>
+    <button onclick="saveCrypto()">Speichern</button>
+    <h3>Bilder</h3>
+    Logo: <input type="file" onchange="uploadImage(event,'logo')"><br>
+    <img id="logoPrev" src="${store.logo}" style="max-height:40px;"><br>
+    Header: <input type="file" onchange="uploadImage(event,'headerImage')"><br>
+    <img id="headerPrev" src="${store.headerImage}" style="max-height:80px;"><br>
+    Hintergrund: <input type="file" onchange="uploadImage(event,'backgroundImage')"><br>
+    <img id="bgPrev" src="${store.backgroundImage}" style="max-height:80px;"><br>
+    <h3>Bestellungen</h3>
+    <pre>${JSON.stringify(store.orders,null,2)}</pre>
+    <button onclick="closePopup('adminPopup')">Schließen</button>
+  `;
+}
+function addCategory(){
+  const val=document.getElementById("newCat").value;
+  if(val){store.categories.push(val);saveStore();renderCategories();openAdmin();}
+}
+function addProduct(){
+  const name=document.getElementById("prodName").value;
+  const price=document.getElementById("prodPrice").value;
+  const desc=document.getElementById("prodDesc").value;
+  const cat=document.getElementById("prodCat").value;
+  if(name&&price){
+    store.products.push({id:Date.now()+"",name,price,desc,category:cat});
+    saveStore();
+    openAdmin();
+  }
+}
+function saveTicker(){
+  store.ticker=document.getElementById("tickerText").value;
+  saveStore();
+  document.getElementById("ticker").textContent=store.ticker;
+}
+function saveCrypto(){
+  try{
+    store.crypto=JSON.parse(document.getElementById("cryptoText").value);
+    saveStore();openAdmin();
+  }catch(e){alert("Ungültiges JSON");}
+}
+function uploadImage(ev,type){
+  const file=ev.target.files[0];
+  const reader=new FileReader();
+  reader.onload=function(e){
+    store[type]=e.target.result;
+    saveStore();
+    applyImages();
+    openAdmin();
+  };
+  reader.readAsDataURL(file);
+}
+function applyImages(){
+  if(store.logo){
+    const logo=document.getElementById("logo");
+    logo.src=store.logo;
+    logo.style.display="inline";
+  }
+  if(store.headerImage){
+    document.getElementById("shopHeader").style.backgroundImage=`url(${store.headerImage})`;
+  }
+  if(store.backgroundImage){
+    document.body.style.backgroundImage=`url(${store.backgroundImage})`;
+  }
+}
+
+/* ---------- Secret Admin Key Combo ---------- */
+document.addEventListener("keydown",function(e){
+  if(e.key==="Ö"||e.key==="Ä"){
+    if(window.lastKey && ((window.lastKey==="Ö"&&e.key==="Ä")||(window.lastKey==="Ä"&&e.key==="Ö"))){
+      const btn=document.createElement("button");
+      btn.textContent="Admin-Eingang";
+      btn.onclick=function(){
+        const pw=prompt("Passwort:");
+        if(pw==="Tz47110815:"){openAdmin();} else {alert("Falsch!");}
+      };
+      document.body.prepend(btn);
+    }
+  }
+  window.lastKey=e.key;
+});
+
+/* ---------- Init ---------- */
+function init(){
+  renderCategories();
+  document.getElementById("ticker").textContent=store.ticker;
+  applyImages();
+}
+init();
+</script>
 </body>
 </html>
